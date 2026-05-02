@@ -6,6 +6,9 @@
   "scripts": {
     "lint": "node --check api/telegram.js && node --check scripts/send-telegram.js"
   },
+  "dependencies": {
+    "@vercel/functions": "^2.2.13"
+  },
   "engines": {
     "node": ">=20"
   }

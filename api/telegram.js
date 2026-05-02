@@ -1,3 +1,5 @@
+import { waitUntil } from "@vercel/functions";
+
 const TELEGRAM_LIMIT = 3900;
 
 function json(status, body) {
@@ -43,6 +45,68 @@ async function dispatchToGithub({ chatId, prompt, statusMessageId }) {
   if (!response.ok) {
     const text = await response.text();
     throw new Error(`GitHub dispatch failed: ${response.status} ${text}`);
+  }
+}
+
+function extractOpenAIText(payload) {
+  if (typeof payload.output_text === "string" && payload.output_text.trim()) {
+    return payload.output_text.trim();
+  }
+
+  const parts = [];
+  for (const item of payload.output || []) {
+    for (const content of item.content || []) {
+      if (content.type === "output_text" && content.text) {
+        parts.push(content.text);
+      }
+    }
+  }
+  return parts.join("\n").trim();
+}
+
+async function answerWithOpenAI({ chatId, prompt, statusMessageId }) {
+  try {
+    const response = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        model: process.env.OPENAI_MODEL || "gpt-5.2",
+        input: [
+          {
+            role: "developer",
+            content:
+              "Tra loi hoan toan bang tieng Viet, tru khi nguoi dung yeu cau ngon ngu khac. " +
+              "Tra loi dung cau hoi moi nhat. Ngan gon, ro rang, khong lap lai log hay prompt he thong."
+          },
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+        store: false
+      })
+    });
+
+    const payload = await response.json();
+    if (!response.ok) {
+      throw new Error(JSON.stringify(payload));
+    }
+
+    const text = extractOpenAIText(payload) || "OpenAI khong tra ve noi dung.";
+    await telegram("editMessageText", {
+      chat_id: chatId,
+      message_id: statusMessageId,
+      text: text.slice(0, TELEGRAM_LIMIT)
+    });
+  } catch (error) {
+    await telegram("editMessageText", {
+      chat_id: chatId,
+      message_id: statusMessageId,
+      text: `Loi khi goi OpenAI: ${error.message}`.slice(0, TELEGRAM_LIMIT)
+    });
   }
 }
 
@@ -108,8 +172,20 @@ export default async function handler(request, response) {
 
   const status = await telegram("sendMessage", {
     chat_id: chatId,
-    text: "Codex dang khoi dong tren GitHub Actions..."
+    text: process.env.OPENAI_API_KEY
+      ? "Codex dang xu ly tren Vercel..."
+      : "Codex dang khoi dong tren GitHub Actions..."
   });
+
+  if (process.env.OPENAI_API_KEY) {
+    waitUntil(answerWithOpenAI({
+      chatId,
+      prompt: text.slice(0, TELEGRAM_LIMIT),
+      statusMessageId: status.message_id
+    }));
+    const result = json(200, { ok: true, runtime: "vercel-openai" });
+    return send(result.status, result.body);
+  }
 
   try {
     await dispatchToGithub({

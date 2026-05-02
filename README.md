@@ -3,9 +3,9 @@
 Bot Telegram nay chay khong can bat may tinh ca nhan:
 
 1. Telegram gui webhook den Vercel.
-2. Vercel xac thuc chat id va goi GitHub `repository_dispatch`.
-3. GitHub Actions chay Codex CLI.
-4. GitHub Actions gui ket qua ve lai Telegram.
+2. Vercel xac thuc chat id.
+3. Neu co `OPENAI_API_KEY`, Vercel goi OpenAI Responses API va tra ket qua ve Telegram.
+4. Neu khong co `OPENAI_API_KEY`, Vercel co the fallback sang GitHub Actions qua `repository_dispatch`.
 
 ## Secrets can cau hinh
 
@@ -17,6 +17,8 @@ Bot Telegram nay chay khong can bat may tinh ca nhan:
 - `GITHUB_OWNER`: `MrTuoi`.
 - `GITHUB_REPO`: `Codex-Tro-Ly`.
 - `GH_DISPATCH_TOKEN`: GitHub fine-grained token co quyen `Actions: read/write` va `Contents: read` tren repo.
+- `OPENAI_API_KEY`: API key OpenAI de Vercel tra loi truc tiep.
+- `OPENAI_MODEL`: mac dinh `gpt-5.2`.
 
 ### GitHub Repository Secrets
 
@@ -59,5 +61,6 @@ npm run lint
 ## Luu y
 
 - Vercel chi nhan webhook va kich hoat job, khong chay Codex truc tiep.
-- GitHub Actions la noi chay Codex CLI, nen can `OPENAI_API_KEY`.
+- Neu dung `OPENAI_API_KEY` tren Vercel, bot tra loi truc tiep tu Vercel va khong can GitHub Actions cho hoi dap thong thuong.
+- GitHub Actions fallback van can `OPENAI_API_KEY` trong GitHub secrets neu muon chay Codex CLI.
 - Khong commit token vao repo.
