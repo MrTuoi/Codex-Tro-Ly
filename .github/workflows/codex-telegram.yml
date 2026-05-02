@@ -1,0 +1,54 @@
+name: Codex Telegram
+
+on:
+  repository_dispatch:
+    types: [telegram_codex_prompt]
+
+permissions:
+  contents: read
+
+jobs:
+  codex:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Codex CLI
+        run: npm install -g @openai/codex
+
+      - name: Run Codex
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          PROMPT: ${{ github.event.client_payload.prompt }}
+        run: |
+          printf '%s\n\n' "$PROMPT" > prompt.txt
+          cat >> prompt.txt <<'PROMPT_EOF'
+---
+Huong dan tra loi: Hay tra loi yeu cau phia tren bang tieng Viet, tru khi nguoi dung yeu cau ngon ngu khac.
+Chi tra loi dung yeu cau phia tren. Khong lap lai transcript, log he thong, hay huong dan nay.
+Giu cau tra loi ngan gon, ro rang.
+PROMPT_EOF
+          codex --ask-for-approval never exec \
+            --sandbox workspace-write \
+            --skip-git-repo-check \
+            --output-last-message codex-result.txt \
+            "$(cat prompt.txt)"
+
+      - name: Send result to Telegram
+        if: always()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          CHAT_ID: ${{ github.event.client_payload.chat_id }}
+          STATUS_MESSAGE_ID: ${{ github.event.client_payload.status_message_id }}
+        run: |
+          if [ ! -s codex-result.txt ]; then
+            echo "Codex khong tra ve ket qua. Hay kiem tra log GitHub Actions." > codex-result.txt
+          fi
+          node scripts/send-telegram.js "$CHAT_ID" "$STATUS_MESSAGE_ID" codex-result.txt

@@ -1,0 +1,12 @@
+{
+  "name": "codex-tro-ly",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "lint": "node --check api/telegram.js && node --check scripts/send-telegram.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
