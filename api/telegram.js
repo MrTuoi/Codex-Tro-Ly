@@ -1,6 +1,7 @@
 import { waitUntil } from "@vercel/functions";
 
 const TELEGRAM_LIMIT = 3900;
+const PROGRESS_STEPS = [12, 24, 38, 52, 67, 79, 88, 94];
 
 function json(status, body) {
   return { status, body };
@@ -65,6 +66,8 @@ function extractOpenAIText(payload) {
 }
 
 async function answerWithOpenAI({ chatId, prompt, statusMessageId }) {
+  let finished = false;
+  const progress = updateProgress({ chatId, statusMessageId, isFinished: () => finished });
   try {
     const response = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
@@ -96,17 +99,39 @@ async function answerWithOpenAI({ chatId, prompt, statusMessageId }) {
     }
 
     const text = extractOpenAIText(payload) || "OpenAI khong tra ve noi dung.";
+    finished = true;
+    await progress;
     await telegram("editMessageText", {
       chat_id: chatId,
       message_id: statusMessageId,
       text: text.slice(0, TELEGRAM_LIMIT)
     });
   } catch (error) {
+    finished = true;
+    await progress;
     await telegram("editMessageText", {
       chat_id: chatId,
       message_id: statusMessageId,
       text: `Loi khi goi OpenAI: ${error.message}`.slice(0, TELEGRAM_LIMIT)
     });
+  }
+}
+
+async function updateProgress({ chatId, statusMessageId, isFinished }) {
+  for (const percent of PROGRESS_STEPS) {
+    await new Promise((resolve) => setTimeout(resolve, 2500));
+    if (isFinished()) {
+      return;
+    }
+    try {
+      await telegram("editMessageText", {
+        chat_id: chatId,
+        message_id: statusMessageId,
+        text: `Dang tai... ${percent}%`
+      });
+    } catch {
+      return;
+    }
   }
 }
 
@@ -172,9 +197,7 @@ export default async function handler(request, response) {
 
   const status = await telegram("sendMessage", {
     chat_id: chatId,
-    text: process.env.OPENAI_API_KEY
-      ? "Codex dang xu ly tren Vercel..."
-      : "Codex dang khoi dong tren GitHub Actions..."
+    text: "Dang tai... 0%"
   });
 
   if (process.env.OPENAI_API_KEY) {
